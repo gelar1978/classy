@@ -260,7 +260,7 @@ class _ResearchDocumentsTabState extends State<ResearchDocumentsTab> {
       return name;
     }
     if (nim.isNotEmpty && nim != '-') {
-      return 'Mahasiswa ($nim)';
+      return nim;
     }
     return 'Mahasiswa';
   }

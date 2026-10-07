@@ -5722,9 +5722,17 @@ router.get('/classes/:classId/research-documents', verifyToken, async (req, res)
 
     let query = `
       SELECT rd.*, 
-             COALESCE(NULLIF(u.full_name, ''), NULLIF(rd.student_name, ''), 'Mahasiswa') AS student_name,
-             COALESCE(NULLIF(u.nim, ''), '-') AS student_nim,
-             u.full_name AS student_full_name,
+             COALESCE(
+               NULLIF(NULLIF(u.full_name, ''), 'Mahasiswa'),
+               NULLIF(NULLIF(car.student_name, ''), 'Mahasiswa'),
+               NULLIF(NULLIF(qcm.student_name, ''), 'Mahasiswa'),
+               NULLIF(NULLIF(rd.student_name, ''), 'Mahasiswa'),
+               u.full_name,
+               rd.student_name,
+               'Mahasiswa'
+             ) AS student_name,
+             COALESCE(NULLIF(u.nim, ''), NULLIF(car.nim, ''), '-') AS student_nim,
+             COALESCE(NULLIF(NULLIF(u.full_name, ''), 'Mahasiswa'), NULLIF(NULLIF(car.student_name, ''), 'Mahasiswa'), NULLIF(NULLIF(qcm.student_name, ''), 'Mahasiswa'), u.full_name, rd.student_name) AS student_full_name,
              u.avatar_url AS student_avatar, u.email AS student_email,
              rg.group_name, rg.group_number, rg.title AS group_title,
              c.dosen_id, du.full_name AS dosen_name, du.signature_url AS dosen_signature_url
@@ -5733,6 +5741,8 @@ router.get('/classes/:classId/research-documents', verifyToken, async (req, res)
       JOIN quizizz_classes c ON c.id = rd.class_id
       LEFT JOIN users u ON u.id = rd.student_id
       LEFT JOIN users du ON du.id = c.dosen_id
+      LEFT JOIN quizizz_class_members qcm ON qcm.class_id = rd.class_id AND qcm.student_id = rd.student_id
+      LEFT JOIN class_attendance_records car ON (car.class_id = rd.class_id AND (car.student_id = rd.student_id OR (u.nim IS NOT NULL AND u.nim != '' AND car.nim = u.nim)))
       WHERE rd.class_id = ?
     `;
     const params = [classId];
