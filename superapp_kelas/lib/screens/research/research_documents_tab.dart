@@ -63,6 +63,13 @@ class _ResearchDocumentsTabState extends State<ResearchDocumentsTab> {
       'defaultName': 'Kelengkapan Berkas CD TA',
     },
     {
+      'key': 'notes',
+      'label': 'Notes',
+      'title': 'Persetujuan Dokumen Notes',
+      'subtitle': 'Sistem persetujuan dokumen catatan bimbingan & revisi',
+      'defaultName': 'Catatan / Notes Bimbingan',
+    },
+    {
       'key': 'proposal',
       'label': 'Proposal',
       'title': 'Persetujuan & Tanda Tangan Dokumen Proposal',
@@ -89,11 +96,12 @@ class _ResearchDocumentsTabState extends State<ResearchDocumentsTab> {
     final raw = (doc['doc_type']?.toString().toLowerCase().trim() ?? '');
     final name = (doc['document_name']?.toString().toLowerCase() ?? '');
 
-    if (raw == 'cd' || raw == 'proposal' || raw == 'laporan_ta' || raw == 'paper') {
+    if (raw == 'cd' || raw == 'notes' || raw == 'proposal' || raw == 'laporan_ta' || raw == 'paper') {
       return raw;
     }
     if (raw == 'lks') {
       if (name.contains('cd')) return 'cd';
+      if (name.contains('note') || name.contains('catatan')) return 'notes';
       if (name.contains('proposal')) return 'proposal';
       if (name.contains('laporan') || name.contains('ta') || name.contains('tugas akhir')) return 'laporan_ta';
       if (name.contains('paper') || name.contains('jurnal') || name.contains('publikasi') || name.contains('manuskrip') || name.contains('artikel')) return 'paper';
@@ -101,12 +109,14 @@ class _ResearchDocumentsTabState extends State<ResearchDocumentsTab> {
     }
     if (raw.isNotEmpty) {
       if (raw.contains('cd')) return 'cd';
+      if (raw.contains('note') || raw.contains('catatan')) return 'notes';
       if (raw.contains('proposal')) return 'proposal';
       if (raw.contains('laporan') || raw.contains('ta')) return 'laporan_ta';
       if (raw.contains('paper') || raw.contains('jurnal') || raw.contains('publikasi')) return 'paper';
       return raw;
     }
     if (name.contains('cd')) return 'cd';
+    if (name.contains('note') || name.contains('catatan')) return 'notes';
     if (name.contains('proposal')) return 'proposal';
     if (name.contains('laporan') || name.contains('ta') || name.contains('tugas akhir')) return 'laporan_ta';
     if (name.contains('paper') || name.contains('jurnal') || name.contains('publikasi') || name.contains('manuskrip') || name.contains('artikel')) return 'paper';
@@ -516,13 +526,15 @@ class _ResearchDocumentsTabState extends State<ResearchDocumentsTab> {
                               Icon(
                                 t['key'] == 'paper'
                                     ? Icons.menu_book_rounded
-                                    : (t['key'] == 'cd'
-                                        ? Icons.album_rounded
-                                        : (t['key'] == 'proposal'
-                                            ? Icons.description_rounded
-                                            : (t['key'] == 'laporan_ta'
-                                                ? Icons.folder_special_rounded
-                                                : Icons.assignment_rounded))),
+                                    : (t['key'] == 'notes'
+                                        ? Icons.sticky_note_2_rounded
+                                        : (t['key'] == 'cd'
+                                            ? Icons.album_rounded
+                                            : (t['key'] == 'proposal'
+                                                ? Icons.description_rounded
+                                                : (t['key'] == 'laporan_ta'
+                                                    ? Icons.folder_special_rounded
+                                                    : Icons.assignment_rounded)))),
                                 size: 16,
                                 color: _kNavyDark,
                               ),
@@ -769,13 +781,15 @@ class _ResearchDocumentsTabState extends State<ResearchDocumentsTab> {
                               Icon(
                                 t['key'] == 'paper'
                                     ? Icons.menu_book_rounded
-                                    : (t['key'] == 'cd'
-                                        ? Icons.album_rounded
-                                        : (t['key'] == 'proposal'
-                                            ? Icons.description_rounded
-                                            : (t['key'] == 'laporan_ta'
-                                                ? Icons.folder_special_rounded
-                                                : Icons.assignment_rounded))),
+                                    : (t['key'] == 'notes'
+                                        ? Icons.sticky_note_2_rounded
+                                        : (t['key'] == 'cd'
+                                            ? Icons.album_rounded
+                                            : (t['key'] == 'proposal'
+                                                ? Icons.description_rounded
+                                                : (t['key'] == 'laporan_ta'
+                                                    ? Icons.folder_special_rounded
+                                                    : Icons.assignment_rounded)))),
                                 size: 16,
                                 color: _kNavyDark,
                               ),
@@ -1818,6 +1832,9 @@ class _ResearchDocumentsTabState extends State<ResearchDocumentsTab> {
               case 'cd':
                 iconData = Icons.album_rounded;
                 break;
+              case 'notes':
+                iconData = Icons.sticky_note_2_rounded;
+                break;
               case 'proposal':
                 iconData = Icons.description_rounded;
                 break;
@@ -2182,7 +2199,7 @@ class _ResearchDocumentsTabState extends State<ResearchDocumentsTab> {
 
     final currentDocs = _currentSubTabDocs;
     final config = _currentSubTabConfig;
-    final isPaperTab = _activeSubTab == 'paper';
+    final isPaperTab = _activeSubTab == 'paper' || _activeSubTab == 'notes';
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobileLayout = screenWidth < 850;
 
@@ -2216,15 +2233,17 @@ class _ResearchDocumentsTabState extends State<ResearchDocumentsTab> {
                         border: Border.all(color: _kNavyDark, width: 1.5),
                       ),
                       child: Icon(
-                        isPaperTab
+                        _activeSubTab == 'paper'
                             ? Icons.menu_book_rounded
-                            : (_activeSubTab == 'cd'
-                                ? Icons.album_rounded
-                                : (_activeSubTab == 'proposal'
-                                    ? Icons.description_rounded
-                                    : (_activeSubTab == 'laporan_ta'
-                                        ? Icons.folder_special_rounded
-                                        : Icons.assignment_turned_in_rounded))),
+                            : (_activeSubTab == 'notes'
+                                ? Icons.sticky_note_2_rounded
+                                : (_activeSubTab == 'cd'
+                                    ? Icons.album_rounded
+                                    : (_activeSubTab == 'proposal'
+                                        ? Icons.description_rounded
+                                        : (_activeSubTab == 'laporan_ta'
+                                            ? Icons.folder_special_rounded
+                                            : Icons.assignment_turned_in_rounded)))),
                         color: _kNavyDark,
                         size: 26,
                       ),
@@ -2393,7 +2412,7 @@ class _ResearchDocumentsTabState extends State<ResearchDocumentsTab> {
   Widget _buildDocumentCard(Map<String, dynamic> doc) {
     final isDosen = _isDosen;
     final docType = _getDocType(doc);
-    final isPaper = docType == 'paper';
+    final isPaper = docType == 'paper' || docType == 'notes';
     final status = doc['status']?.toString() ?? 'pending';
     final isApproved = status == 'approved';
     final isRejected = status == 'rejected';

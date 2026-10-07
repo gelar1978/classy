@@ -5855,6 +5855,7 @@ router.post('/classes/:classId/research-documents', verifyToken, optionalUploadD
     if (!finalDocType || finalDocType === 'lks') {
       const lowerName = document_name.toLowerCase();
       if (lowerName.includes('cd')) finalDocType = 'cd';
+      else if (lowerName.includes('note') || lowerName.includes('catatan')) finalDocType = 'notes';
       else if (lowerName.includes('proposal')) finalDocType = 'proposal';
       else if (lowerName.includes('laporan') || lowerName.includes('ta') || lowerName.includes('tugas akhir')) finalDocType = 'laporan_ta';
       else if (lowerName.includes('paper') || lowerName.includes('jurnal') || lowerName.includes('publikasi') || lowerName.includes('artikel')) finalDocType = 'paper';
