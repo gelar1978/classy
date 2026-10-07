@@ -1,0 +1,66 @@
+name: Deploy Classly to Hostinger
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java (for Android/Flutter tools if needed)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Flutter Dependencies & Build Web
+        run: |
+          cd superapp_kelas
+          flutter pub get
+          flutter build web --release --base-href /
+
+      - name: Deploy Frontend to Hostinger via FTP/FTPS
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.HOSTINGER_FTP_SERVER || '31.220.110.143' }}
+          username: ${{ secrets.HOSTINGER_FTP_USER || 'u808298365' }}
+          password: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
+          server-dir: domains/harukaindonesia.id/public_html/classly/
+          local-dir: superapp_kelas/build/web/
+          dangerous-clean-slate: false
+
+      - name: Deploy Backend to Hostinger via FTP/FTPS
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.HOSTINGER_FTP_SERVER || '31.220.110.143' }}
+          username: ${{ secrets.HOSTINGER_FTP_USER || 'u808298365' }}
+          password: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
+          server-dir: domains/harukaindonesia.id/stegano/
+          local-dir: superapp-backend/
+          dangerous-clean-slate: false
+
+      - name: Restart Backend PM2 on Hostinger via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        if: ${{ env.SSH_ENABLED == 'true' }}
+        continue-on-error: true
+        with:
+          host: 31.220.110.143
+          port: 65002
+          username: u808298365
+          password: ${{ secrets.HOSTINGER_SSH_PASSWORD }}
+          script: |
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+            pm2 restart stegano || true
