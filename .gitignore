@@ -1,0 +1,65 @@
+# OS Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Archives & Temporary deployment bundles
+*.tar.gz
+*.zip
+*.b64
+
+# Backend Node.js
+superapp-backend/node_modules/
+superapp-backend/uploads/
+superapp-backend/.env
+superapp-backend/scratch_*
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Flutter / Dart
+superapp_kelas/.dart_tool/
+superapp_kelas/.flutter-plugins
+superapp_kelas/.flutter-plugins-dependencies
+superapp_kelas/.packages
+superapp_kelas/.pub-cache/
+superapp_kelas/.pub/
+superapp_kelas/build/
+superapp_kelas/analyze_*.txt
+
+# Android
+superapp_kelas/android/.gradle
+superapp_kelas/android/local.properties
+superapp_kelas/android/gradle/
+superapp_kelas/android/captures/
+superapp_kelas/android/gradlew
+superapp_kelas/android/gradlew.bat
+
+# iOS / macOS
+superapp_kelas/ios/Pods/
+superapp_kelas/ios/.symlinks/
+superapp_kelas/ios/Flutter/Flutter.framework
+superapp_kelas/ios/Flutter/Flutter.podspec
+superapp_kelas/ios/Flutter/Generated.xcconfig
+superapp_kelas/ios/Flutter/app.framework
+superapp_kelas/ios/Flutter/engine/
+superapp_kelas/macos/Pods/
+superapp_kelas/macos/Flutter/ephemeral/
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+superapp-backend/public/
+# Scratch scripts
+patch_*.py
+fix_*.py
+check.py
+revert_*.py
+update_*.py
+superapp_kelas/*.py

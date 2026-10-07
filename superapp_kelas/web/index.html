@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="A new Flutter project.">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="superapp_kelas">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <!-- Google Fonts & Noto Color Emoji Fallback -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=Noto+Color+Emoji&display=swap" rel="stylesheet">
+
+  <title>superapp_kelas</title>
+  <link rel="manifest" href="manifest.json">
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script>
+    let activeScanner = null;
+    window.startQrScanner = function(callback) {
+      let modal = document.getElementById('qr-scanner-modal');
+      if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'qr-scanner-modal';
+        modal.style.position = 'fixed';
+        modal.style.top = '0';
+        modal.style.left = '0';
+        modal.style.width = '100vw';
+        modal.style.height = '100vh';
+        modal.style.backgroundColor = 'rgba(0,0,0,0.85)';
+        modal.style.zIndex = '999999';
+        modal.style.display = 'flex';
+        modal.style.flexDirection = 'column';
+        modal.style.alignItems = 'center';
+        modal.style.justifyContent = 'center';
+        modal.style.padding = '16px';
+        modal.style.boxSizing = 'border-box';
+        modal.style.fontFamily = 'Inter, sans-serif';
+
+        modal.innerHTML = `
+          <div style="background: white; border-radius: 20px; max-width: 440px; width: 100%; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); text-align: center; border: 2px solid #001D39; box-sizing: border-box;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <h3 style="margin: 0; color: #001D39; font-size: 16px; font-weight: 800;">📷 Scan QR Code Kelas / Presensi</h3>
+              <button id="qr-close-btn" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #666; font-weight: bold; line-height: 1;">✕</button>
+            </div>
+            <p style="font-size: 12px; color: #555; margin: 0 0 12px 0;">Arahkan kamera ke QR Code kelas/grup riset/presensi dosen Anda.</p>
+            <div id="qr-reader" style="width: 100%; border-radius: 14px; overflow: hidden; background: #000; min-height: 240px;"></div>
+            <div style="margin-top: 14px; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+              <button id="qr-file-btn" style="background: #EFF6FF; color: #1D4ED8; border: 1.5px solid #93C5FD; border-radius: 10px; padding: 10px 16px; font-size: 12px; font-weight: bold; cursor: pointer;">🖼️ Unggah Gambar QR</button>
+              <input type="file" id="qr-file-input" accept="image/*" style="display: none;" />
+            </div>
+          </div>
+        `;
+        document.body.appendChild(modal);
+      } else {
+        modal.style.display = 'flex';
+      }
+
+      function closeScanner() {
+        if (activeScanner) {
+          activeScanner.stop().catch(() => {}).then(() => {
+            modal.style.display = 'none';
+          });
+        } else {
+          modal.style.display = 'none';
+        }
+      }
+
+      document.getElementById('qr-close-btn').onclick = closeScanner;
+
+      document.getElementById('qr-file-btn').onclick = function() {
+        document.getElementById('qr-file-input').click();
+      };
+
+      document.getElementById('qr-file-input').onchange = function(e) {
+        if (e.target.files.length === 0) return;
+        const file = e.target.files[0];
+        const html5QrCode = new Html5Qrcode("qr-reader");
+        html5QrCode.scanFile(file, true)
+          .then(decodedText => {
+            closeScanner();
+            if (typeof callback === 'function') {
+              callback(decodedText);
+            }
+          })
+          .catch(err => {
+            alert('Tidak dapat membaca QR Code dari gambar tersebut. Pastikan QR code terlihat jelas.');
+          });
+      };
+
+      try {
+        activeScanner = new Html5Qrcode("qr-reader");
+        const config = { fps: 10, qrbox: { width: 220, height: 220 } };
+        activeScanner.start({ facingMode: "environment" }, config, (decodedText) => {
+          closeScanner();
+          if (typeof callback === 'function') {
+            callback(decodedText);
+          }
+        }).catch(err => {
+          console.warn("Camera start warning/fallback:", err);
+        });
+      } catch (err) {
+        console.error("QR scanner init error:", err);
+      }
+    };
+
+    window.scanQrFromFile = function(callback) {
+      let fileInput = document.getElementById('qr-direct-file-input');
+      let tempDiv = document.getElementById('qr-direct-temp');
+      if (!tempDiv) {
+        tempDiv = document.createElement('div');
+        tempDiv.id = 'qr-direct-temp';
+        tempDiv.style.display = 'none';
+        document.body.appendChild(tempDiv);
+      }
+      if (!fileInput) {
+        fileInput = document.createElement('input');
+        fileInput.id = 'qr-direct-file-input';
+        fileInput.type = 'file';
+        fileInput.accept = 'image/*';
+        fileInput.style.display = 'none';
+        document.body.appendChild(fileInput);
+      }
+      fileInput.value = '';
+      fileInput.onchange = function(e) {
+        if (e.target.files.length === 0) {
+          if (typeof callback === 'function') callback(null);
+          return;
+        }
+        const file = e.target.files[0];
+        const html5QrCode = new Html5Qrcode("qr-direct-temp");
+        html5QrCode.scanFile(file, true)
+          .then(decodedText => {
+            if (typeof callback === 'function') callback(decodedText);
+          })
+          .catch(err => {
+            alert('Tidak dapat membaca QR Code dari file/gambar yang diunggah. Pastikan QR code terlihat jelas.');
+            if (typeof callback === 'function') callback(null);
+          });
+      };
+      fileInput.click();
+    };
+
+    window.captureSelfiePhoto = function(callback) {
+      let modal = document.getElementById('selfie-capture-modal');
+      let stream = null;
+
+      if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'selfie-capture-modal';
+        modal.style.position = 'fixed';
+        modal.style.top = '0';
+        modal.style.left = '0';
+        modal.style.width = '100vw';
+        modal.style.height = '100vh';
+        modal.style.backgroundColor = 'rgba(0,0,0,0.85)';
+        modal.style.zIndex = '999999';
+        modal.style.display = 'flex';
+        modal.style.flexDirection = 'column';
+        modal.style.alignItems = 'center';
+        modal.style.justifyContent = 'center';
+        modal.style.padding = '16px';
+        modal.style.boxSizing = 'border-box';
+        modal.style.fontFamily = 'Inter, sans-serif';
+
+        modal.innerHTML = `
+          <div style="background: white; border-radius: 24px; max-width: 440px; width: 100%; padding: 22px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); text-align: center; border: 2px solid #001D39; box-sizing: border-box;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <h3 style="margin: 0; color: #001D39; font-size: 16px; font-weight: 800;">📸 Ambil Foto Profil (Close-Up)</h3>
+              <button id="selfie-close-btn" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #666; font-weight: bold; line-height: 1;">✕</button>
+            </div>
+            <p style="font-size: 12px; color: #555; margin: 0 0 14px 0;">Posisikan wajah Anda tepat di dalam lingkaran (close-up).</p>
+            
+            <div style="position: relative; width: 260px; height: 260px; margin: 0 auto; border-radius: 50%; overflow: hidden; background: #000; border: 3px solid #7BBDE8; box-shadow: 0 4px 14px rgba(0,0,0,0.2);">
+              <video id="selfie-video" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);"></video>
+            </div>
+
+            <div style="margin-top: 18px; display: flex; gap: 10px; justify-content: center;">
+              <button id="selfie-cancel-btn" style="background: #F1F5F9; color: #001D39; border: 1.5px solid #CBD5E1; border-radius: 12px; padding: 10px 18px; font-size: 13px; font-weight: bold; cursor: pointer;">Batal</button>
+              <button id="selfie-snap-btn" style="background: #001D39; color: #fff; border: none; border-radius: 12px; padding: 10px 24px; font-size: 13px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 6px;">📸 Ambil Foto</button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(modal);
+      } else {
+        modal.style.display = 'flex';
+      }
+
+      const video = document.getElementById('selfie-video');
+
+      function closeSelfieModal() {
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+          stream = null;
+        }
+        modal.style.display = 'none';
+      }
+
+      document.getElementById('selfie-close-btn').onclick = function() {
+        closeSelfieModal();
+        if (typeof callback === 'function') callback(null);
+      };
+      document.getElementById('selfie-cancel-btn').onclick = function() {
+        closeSelfieModal();
+        if (typeof callback === 'function') callback(null);
+      };
+
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 640 } } })
+        .then(s => {
+          stream = s;
+          video.srcObject = s;
+          video.play();
+        })
+        .catch(err => {
+          alert('Tidak dapat mengakses kamera: ' + err.message);
+          closeSelfieModal();
+          if (typeof callback === 'function') callback(null);
+        });
+
+      document.getElementById('selfie-snap-btn').onclick = function() {
+        if (!video || !stream) return;
+        const canvas = document.createElement('canvas');
+        canvas.width = 400;
+        canvas.height = 400;
+        const ctx = canvas.getContext('2d');
+        
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1);
+        
+        const minDim = Math.min(video.videoWidth, video.videoHeight) || 400;
+        const sx = ((video.videoWidth || minDim) - minDim) / 2;
+        const sy = ((video.videoHeight || minDim) - minDim) / 2;
+        ctx.drawImage(video, sx, sy, minDim, minDim, 0, 0, 400, 400);
+
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+        closeSelfieModal();
+        if (typeof callback === 'function') {
+          callback(dataUrl);
+        }
+      };
+    };
+
+    window.copyImageToClipboard = async function(base64Png) {
+      if (!navigator.clipboard || !window.ClipboardItem) {
+        throw new Error("Clipboard API tidak didukung di browser ini.");
+      }
+      const res = await fetch(base64Png);
+      const blob = await res.blob();
+      const item = new ClipboardItem({ "image/png": blob });
+      await navigator.clipboard.write([item]);
+      return true;
+    };
+
+    let activeSpeechRecognizer = null;
+    window.startSpeechRecognition = function(onResultCallback, onEndCallback) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        alert('Browser ini belum mendukung Web Speech Recognition. Gunakan browser modern seperti Google Chrome atau Edge.');
+        if (typeof onEndCallback === 'function') onEndCallback();
+        return false;
+      }
+
+      if (activeSpeechRecognizer) {
+        try { activeSpeechRecognizer.abort(); } catch(e) {}
+        activeSpeechRecognizer = null;
+      }
+
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'id-ID';
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      activeSpeechRecognizer = recognition;
+
+      recognition.onresult = function(event) {
+        let fullTranscript = '';
+        for (let i = 0; i < event.results.length; ++i) {
+          fullTranscript += event.results[i][0].transcript;
+        }
+        const currentText = fullTranscript.trim();
+        if (typeof onResultCallback === 'function') {
+          onResultCallback(currentText);
+        }
+      };
+
+      recognition.onerror = function(event) {
+        console.warn('Speech recognition error:', event.error);
+        if (typeof onEndCallback === 'function') onEndCallback();
+      };
+
+      recognition.onend = function() {
+        activeSpeechRecognizer = null;
+        if (typeof onEndCallback === 'function') onEndCallback();
+      };
+
+      try {
+        recognition.start();
+        return true;
+      } catch(e) {
+        console.error('Speech recognition start error:', e);
+        if (typeof onEndCallback === 'function') onEndCallback();
+        return false;
+      }
+    };
+
+    window.stopSpeechRecognition = function() {
+      if (activeSpeechRecognizer) {
+        try {
+          activeSpeechRecognizer.stop();
+        } catch(e) {}
+        activeSpeechRecognizer = null;
+      }
+    };
+  </script>
+</head>
+<body>
+  <script>
+    // 1. Force unregister any stale service workers & purge browser CacheStorage
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for (let registration of registrations) {
+          registration.unregister();
+        }
+      });
+    }
+    if ('caches' in window) {
+      caches.keys().then(function(names) {
+        for (let name of names) {
+          caches.delete(name);
+        }
+      });
+    }
+
+    // 2. Load Flutter engine directly with timestamp cache-buster on main.dart.js
+    const v = Date.now();
+    const flutterScript = document.createElement('script');
+    flutterScript.src = 'flutter.js?v=' + v;
+    flutterScript.onload = function() {
+      if (window._flutter && window._flutter.loader) {
+        _flutter.loader.loadEntrypoint({
+          entrypointUrl: 'main.dart.js?v=' + v,
+          onEntrypointLoaded: function(engineInitializer) {
+            engineInitializer.initializeEngine().then(function(appRunner) {
+              appRunner.runApp();
+            });
+          }
+        });
+      }
+    };
+    document.body.appendChild(flutterScript);
+  </script>
+</body>
+</html>
