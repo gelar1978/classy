@@ -5723,7 +5723,7 @@ router.get('/classes/:classId/research-documents', verifyToken, async (req, res)
     let query = `
       SELECT rd.*, 
              COALESCE(NULLIF(u.full_name, ''), NULLIF(rd.student_name, ''), 'Mahasiswa') AS student_name,
-             COALESCE(NULLIF(u.nim, ''), NULLIF(rd.student_nim, ''), '-') AS student_nim,
+             COALESCE(NULLIF(u.nim, ''), '-') AS student_nim,
              u.full_name AS student_full_name,
              u.avatar_url AS student_avatar, u.email AS student_email,
              rg.group_name, rg.group_number, rg.title AS group_title,
@@ -5860,7 +5860,7 @@ router.post('/classes/:classId/research-documents', verifyToken, optionalUploadD
     const [created] = await pool.query(`
       SELECT rd.*, 
              COALESCE(NULLIF(u.full_name, ''), NULLIF(rd.student_name, ''), 'Mahasiswa') AS student_name,
-             COALESCE(NULLIF(u.nim, ''), NULLIF(rd.student_nim, ''), '-') AS student_nim,
+             COALESCE(NULLIF(u.nim, ''), '-') AS student_nim,
              u.full_name AS student_full_name,
              u.avatar_url AS student_avatar, u.email AS student_email,
              rg.group_name, rg.group_number, rg.title AS group_title
