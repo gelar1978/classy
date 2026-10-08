@@ -1,5 +1,24 @@
+# ==============================================================================
+# CLASSLY HIGH-PERFORMANCE APACHE / LITESPEED CONFIGURATION
+# ==============================================================================
+
+DirectoryIndex index.html index.php
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # 1. Proxy /api, /uploads, /socket.io to index.php (Node.js backend proxy)
+  RewriteRule ^(api|uploads|socket\.io)(.*)$ index.php [QSA,L]
+
+  # 2. Route missing files / SPA routes to index.html for Flutter Web
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^(.*)$ index.html [L]
+</IfModule>
+
 # ------------------------------------------------------------------------------
-# 1. GZIP / DEFLATE COMPRESSION
+# 3. GZIP / DEFLATE COMPRESSION
 # ------------------------------------------------------------------------------
 <IfModule mod_deflate.c>
   AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript
@@ -9,7 +28,7 @@
 </IfModule>
 
 # ------------------------------------------------------------------------------
-# 2. BROWSER CACHING (EXPIRES HEADERS)
+# 4. BROWSER CACHING (EXPIRES HEADERS)
 # ------------------------------------------------------------------------------
 <IfModule mod_expires.c>
   ExpiresActive On
@@ -29,7 +48,7 @@
 </IfModule>
 
 # ------------------------------------------------------------------------------
-# 3. CACHE CONTROL HEADERS
+# 5. CACHE CONTROL HEADERS
 # ------------------------------------------------------------------------------
 <IfModule mod_headers.c>
   <FilesMatch "(index\.html|flutter_service_worker\.js|version\.json)$">
@@ -44,22 +63,11 @@
 </IfModule>
 
 # ------------------------------------------------------------------------------
-# 4. MIME TYPES
+# 6. MIME TYPES
 # ------------------------------------------------------------------------------
 <IfModule mod_mime.c>
   AddType application/wasm .wasm
   AddType application/javascript .js
   AddType application/json .json
   AddType image/svg+xml .svg
-</IfModule>
-
-# ------------------------------------------------------------------------------
-# 5. SPA ROUTING
-# ------------------------------------------------------------------------------
-<IfModule mod_rewrite.c>
-  RewriteEngine On
-  RewriteBase /
-  RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteRule . /index.html [L]
 </IfModule>
