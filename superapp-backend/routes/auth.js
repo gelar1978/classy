@@ -137,7 +137,11 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    const [rows] = await pool.query('SELECT * FROM users WHERE email = ? OR nim = ?', [email, email]);
+    const identifier = String(email).trim();
+    const [rows] = await pool.query(
+      'SELECT * FROM users WHERE email = ? OR nim = ? OR email LIKE CONCAT(?, \'@%\')',
+      [identifier, identifier, identifier]
+    );
     if (rows.length === 0) {
       return res.status(401).json({ status: 'gagal', message: 'Email/NIM atau password salah' });
     }
@@ -145,7 +149,7 @@ router.post('/login', async (req, res) => {
     const user = rows[0];
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
-      return res.status(401).json({ status: 'gagal', message: 'Email atau password salah' });
+      return res.status(401).json({ status: 'gagal', message: 'Email/NIM atau password salah' });
     }
 
     const token = jwt.sign(
