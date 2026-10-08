@@ -1,0 +1,65 @@
+# ------------------------------------------------------------------------------
+# 1. GZIP / DEFLATE COMPRESSION
+# ------------------------------------------------------------------------------
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript
+  AddOutputFilterByType DEFLATE application/javascript application/x-javascript application/json
+  AddOutputFilterByType DEFLATE application/xml application/xhtml+xml application/rss+xml
+  AddOutputFilterByType DEFLATE application/wasm image/svg+xml font/opentype font/otf font/ttf
+</IfModule>
+
+# ------------------------------------------------------------------------------
+# 2. BROWSER CACHING (EXPIRES HEADERS)
+# ------------------------------------------------------------------------------
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresDefault "access plus 1 month"
+
+  ExpiresByType text/html "access plus 0 seconds"
+  ExpiresByType application/x-javascript "access plus 1 month"
+  ExpiresByType application/javascript "access plus 1 month"
+  ExpiresByType application/wasm "access plus 1 year"
+  ExpiresByType application/json "access plus 0 seconds"
+  ExpiresByType image/png "access plus 1 year"
+  ExpiresByType image/jpeg "access plus 1 year"
+  ExpiresByType image/svg+xml "access plus 1 year"
+  ExpiresByType font/ttf "access plus 1 year"
+  ExpiresByType font/otf "access plus 1 year"
+  ExpiresByType font/woff2 "access plus 1 year"
+</IfModule>
+
+# ------------------------------------------------------------------------------
+# 3. CACHE CONTROL HEADERS
+# ------------------------------------------------------------------------------
+<IfModule mod_headers.c>
+  <FilesMatch "(index\.html|flutter_service_worker\.js|version\.json)$">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+
+  <FilesMatch "\.(js|wasm|css|png|jpg|jpeg|gif|ico|svg|ttf|otf|woff|woff2)$">
+    Header set Cache-Control "public, max-age=2592000, immutable"
+  </FilesMatch>
+
+  Header always set X-Content-Type-Options "nosniff"
+</IfModule>
+
+# ------------------------------------------------------------------------------
+# 4. MIME TYPES
+# ------------------------------------------------------------------------------
+<IfModule mod_mime.c>
+  AddType application/wasm .wasm
+  AddType application/javascript .js
+  AddType application/json .json
+  AddType image/svg+xml .svg
+</IfModule>
+
+# ------------------------------------------------------------------------------
+# 5. SPA ROUTING
+# ------------------------------------------------------------------------------
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /index.html [L]
+</IfModule>

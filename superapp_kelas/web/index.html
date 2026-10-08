@@ -1,156 +1,237 @@
 <!DOCTYPE html>
-<html>
+<html lang="id">
 <head>
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Classly - Platform Pembelajaran Interaktif & Presensi Perkuliahan">
+  <meta name="theme-color" content="#001D39">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="superapp_kelas">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Classly">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <!-- Google Fonts & Noto Color Emoji Fallback -->
+  <!-- Preconnect to Fonts CDN -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=Noto+Color+Emoji&display=swap" rel="stylesheet">
+  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=Noto+Color+Emoji&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=Noto+Color+Emoji&display=swap" rel="stylesheet">
+  </noscript>
 
-  <title>superapp_kelas</title>
+  <title>Classly</title>
   <link rel="manifest" href="manifest.json">
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+  <style>
+    /* Critical Splash & Reset CSS for Instant First Contentful Paint */
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #F8FAFC;
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      overflow: hidden;
+    }
+    #app-preloader {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #001D39 0%, #0F2942 100%);
+      z-index: 999999;
+      transition: opacity 0.35s ease-out, visibility 0.35s ease-out;
+    }
+    .preloader-box {
+      text-align: center;
+      color: #FFFFFF;
+      padding: 24px;
+    }
+    .preloader-title {
+      font-size: 26px;
+      font-weight: 900;
+      letter-spacing: 1.5px;
+      margin: 12px 0 6px 0;
+      color: #FFFFFF;
+    }
+    .preloader-sub {
+      font-size: 13px;
+      color: #7BBDE8;
+      font-weight: 600;
+      margin-bottom: 24px;
+    }
+    .preloader-spinner {
+      width: 36px;
+      height: 36px;
+      border: 3.5px solid rgba(123, 189, 232, 0.25);
+      border-top-color: #7BBDE8;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+
   <script>
+    // ------------------------------------------------------------------
+    // DYNAMIC QR SCANNER LOADER (Loads html5-qrcode asynchronously on demand)
+    // ------------------------------------------------------------------
+    function ensureQrLibrary(callback) {
+      if (window.Html5Qrcode) {
+        if (typeof callback === 'function') callback();
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
+      script.async = true;
+      script.onload = function() {
+        if (typeof callback === 'function') callback();
+      };
+      script.onerror = function() {
+        alert('Gagal memuat pustaka QR Scanner. Pastikan koneksi internet Anda aktif.');
+      };
+      document.head.appendChild(script);
+    }
+
     let activeScanner = null;
     window.startQrScanner = function(callback) {
-      let modal = document.getElementById('qr-scanner-modal');
-      if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'qr-scanner-modal';
-        modal.style.position = 'fixed';
-        modal.style.top = '0';
-        modal.style.left = '0';
-        modal.style.width = '100vw';
-        modal.style.height = '100vh';
-        modal.style.backgroundColor = 'rgba(0,0,0,0.85)';
-        modal.style.zIndex = '999999';
-        modal.style.display = 'flex';
-        modal.style.flexDirection = 'column';
-        modal.style.alignItems = 'center';
-        modal.style.justifyContent = 'center';
-        modal.style.padding = '16px';
-        modal.style.boxSizing = 'border-box';
-        modal.style.fontFamily = 'Inter, sans-serif';
+      ensureQrLibrary(function() {
+        let modal = document.getElementById('qr-scanner-modal');
+        if (!modal) {
+          modal = document.createElement('div');
+          modal.id = 'qr-scanner-modal';
+          modal.style.position = 'fixed';
+          modal.style.top = '0';
+          modal.style.left = '0';
+          modal.style.width = '100vw';
+          modal.style.height = '100vh';
+          modal.style.backgroundColor = 'rgba(0,0,0,0.85)';
+          modal.style.zIndex = '999999';
+          modal.style.display = 'flex';
+          modal.style.flexDirection = 'column';
+          modal.style.alignItems = 'center';
+          modal.style.justifyContent = 'center';
+          modal.style.padding = '16px';
+          modal.style.boxSizing = 'border-box';
+          modal.style.fontFamily = 'Inter, sans-serif';
 
-        modal.innerHTML = `
-          <div style="background: white; border-radius: 20px; max-width: 440px; width: 100%; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); text-align: center; border: 2px solid #001D39; box-sizing: border-box;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-              <h3 style="margin: 0; color: #001D39; font-size: 16px; font-weight: 800;">📷 Scan QR Code Kelas / Presensi</h3>
-              <button id="qr-close-btn" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #666; font-weight: bold; line-height: 1;">✕</button>
+          modal.innerHTML = `
+            <div style="background: white; border-radius: 20px; max-width: 440px; width: 100%; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); text-align: center; border: 2px solid #001D39; box-sizing: border-box;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h3 style="margin: 0; color: #001D39; font-size: 16px; font-weight: 800;">📷 Scan QR Code Kelas / Presensi</h3>
+                <button id="qr-close-btn" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #666; font-weight: bold; line-height: 1;">✕</button>
+              </div>
+              <p style="font-size: 12px; color: #555; margin: 0 0 12px 0;">Arahkan kamera ke QR Code kelas/grup riset/presensi dosen Anda.</p>
+              <div id="qr-reader" style="width: 100%; border-radius: 14px; overflow: hidden; background: #000; min-height: 240px;"></div>
+              <div style="margin-top: 14px; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+                <button id="qr-file-btn" style="background: #EFF6FF; color: #1D4ED8; border: 1.5px solid #93C5FD; border-radius: 10px; padding: 10px 16px; font-size: 12px; font-weight: bold; cursor: pointer;">🖼️ Unggah Gambar QR</button>
+                <input type="file" id="qr-file-input" accept="image/*" style="display: none;" />
+              </div>
             </div>
-            <p style="font-size: 12px; color: #555; margin: 0 0 12px 0;">Arahkan kamera ke QR Code kelas/grup riset/presensi dosen Anda.</p>
-            <div id="qr-reader" style="width: 100%; border-radius: 14px; overflow: hidden; background: #000; min-height: 240px;"></div>
-            <div style="margin-top: 14px; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
-              <button id="qr-file-btn" style="background: #EFF6FF; color: #1D4ED8; border: 1.5px solid #93C5FD; border-radius: 10px; padding: 10px 16px; font-size: 12px; font-weight: bold; cursor: pointer;">🖼️ Unggah Gambar QR</button>
-              <input type="file" id="qr-file-input" accept="image/*" style="display: none;" />
-            </div>
-          </div>
-        `;
-        document.body.appendChild(modal);
-      } else {
-        modal.style.display = 'flex';
-      }
-
-      function closeScanner() {
-        if (activeScanner) {
-          activeScanner.stop().catch(() => {}).then(() => {
-            modal.style.display = 'none';
-          });
+          `;
+          document.body.appendChild(modal);
         } else {
-          modal.style.display = 'none';
+          modal.style.display = 'flex';
         }
-      }
 
-      document.getElementById('qr-close-btn').onclick = closeScanner;
+        function closeScanner() {
+          if (activeScanner) {
+            activeScanner.stop().catch(() => {}).then(() => {
+              modal.style.display = 'none';
+            });
+          } else {
+            modal.style.display = 'none';
+          }
+        }
 
-      document.getElementById('qr-file-btn').onclick = function() {
-        document.getElementById('qr-file-input').click();
-      };
+        document.getElementById('qr-close-btn').onclick = closeScanner;
 
-      document.getElementById('qr-file-input').onchange = function(e) {
-        if (e.target.files.length === 0) return;
-        const file = e.target.files[0];
-        const html5QrCode = new Html5Qrcode("qr-reader");
-        html5QrCode.scanFile(file, true)
-          .then(decodedText => {
+        document.getElementById('qr-file-btn').onclick = function() {
+          document.getElementById('qr-file-input').click();
+        };
+
+        document.getElementById('qr-file-input').onchange = function(e) {
+          if (e.target.files.length === 0) return;
+          const file = e.target.files[0];
+          const html5QrCode = new Html5Qrcode("qr-reader");
+          html5QrCode.scanFile(file, true)
+            .then(decodedText => {
+              closeScanner();
+              if (typeof callback === 'function') {
+                callback(decodedText);
+              }
+            })
+            .catch(err => {
+              alert('Tidak dapat membaca QR Code dari gambar tersebut. Pastikan QR code terlihat jelas.');
+            });
+        };
+
+        try {
+          activeScanner = new Html5Qrcode("qr-reader");
+          const config = { fps: 10, qrbox: { width: 220, height: 220 } };
+          activeScanner.start({ facingMode: "environment" }, config, (decodedText) => {
             closeScanner();
             if (typeof callback === 'function') {
               callback(decodedText);
             }
-          })
-          .catch(err => {
-            alert('Tidak dapat membaca QR Code dari gambar tersebut. Pastikan QR code terlihat jelas.');
+          }).catch(err => {
+            console.warn("Camera start warning/fallback:", err);
           });
-      };
-
-      try {
-        activeScanner = new Html5Qrcode("qr-reader");
-        const config = { fps: 10, qrbox: { width: 220, height: 220 } };
-        activeScanner.start({ facingMode: "environment" }, config, (decodedText) => {
-          closeScanner();
-          if (typeof callback === 'function') {
-            callback(decodedText);
-          }
-        }).catch(err => {
-          console.warn("Camera start warning/fallback:", err);
-        });
-      } catch (err) {
-        console.error("QR scanner init error:", err);
-      }
+        } catch (err) {
+          console.error("QR scanner init error:", err);
+        }
+      });
     };
 
     window.scanQrFromFile = function(callback) {
-      let fileInput = document.getElementById('qr-direct-file-input');
-      let tempDiv = document.getElementById('qr-direct-temp');
-      if (!tempDiv) {
-        tempDiv = document.createElement('div');
-        tempDiv.id = 'qr-direct-temp';
-        tempDiv.style.display = 'none';
-        document.body.appendChild(tempDiv);
-      }
-      if (!fileInput) {
-        fileInput = document.createElement('input');
-        fileInput.id = 'qr-direct-file-input';
-        fileInput.type = 'file';
-        fileInput.accept = 'image/*';
-        fileInput.style.display = 'none';
-        document.body.appendChild(fileInput);
-      }
-      fileInput.value = '';
-      fileInput.onchange = function(e) {
-        if (e.target.files.length === 0) {
-          if (typeof callback === 'function') callback(null);
-          return;
+      ensureQrLibrary(function() {
+        let fileInput = document.getElementById('qr-direct-file-input');
+        let tempDiv = document.getElementById('qr-direct-temp');
+        if (!tempDiv) {
+          tempDiv = document.createElement('div');
+          tempDiv.id = 'qr-direct-temp';
+          tempDiv.style.display = 'none';
+          document.body.appendChild(tempDiv);
         }
-        const file = e.target.files[0];
-        const html5QrCode = new Html5Qrcode("qr-direct-temp");
-        html5QrCode.scanFile(file, true)
-          .then(decodedText => {
-            if (typeof callback === 'function') callback(decodedText);
-          })
-          .catch(err => {
-            alert('Tidak dapat membaca QR Code dari file/gambar yang diunggah. Pastikan QR code terlihat jelas.');
+        if (!fileInput) {
+          fileInput = document.createElement('input');
+          fileInput.id = 'qr-direct-file-input';
+          fileInput.type = 'file';
+          fileInput.accept = 'image/*';
+          fileInput.style.display = 'none';
+          document.body.appendChild(fileInput);
+        }
+        fileInput.value = '';
+        fileInput.onchange = function(e) {
+          if (e.target.files.length === 0) {
             if (typeof callback === 'function') callback(null);
-          });
-      };
-      fileInput.click();
+            return;
+          }
+          const file = e.target.files[0];
+          const html5QrCode = new Html5Qrcode("qr-direct-temp");
+          html5QrCode.scanFile(file, true)
+            .then(decodedText => {
+              if (typeof callback === 'function') callback(decodedText);
+            })
+            .catch(err => {
+              alert('Tidak dapat membaca QR Code dari file/gambar yang diunggah. Pastikan QR code terlihat jelas.');
+              if (typeof callback === 'function') callback(null);
+            });
+        };
+        fileInput.click();
+      });
     };
 
     window.captureSelfiePhoto = function(callback) {
@@ -325,40 +406,35 @@
   </script>
 </head>
 <body>
-  <script>
-    // 1. Force unregister any stale service workers & purge browser CacheStorage
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(function(registrations) {
-        for (let registration of registrations) {
-          registration.unregister();
-        }
-      });
-    }
-    if ('caches' in window) {
-      caches.keys().then(function(names) {
-        for (let name of names) {
-          caches.delete(name);
-        }
-      });
-    }
+  <!-- INSTANT SPLASH PRELOADER FOR HIGH PAGESPEED SCORE -->
+  <div id="app-preloader">
+    <div class="preloader-box">
+      <div style="font-size: 38px; margin-bottom: 6px;">🎓</div>
+      <div class="preloader-title">CLASSLY</div>
+      <div class="preloader-sub">Memuat Ruang Kelas & Presensi...</div>
+      <div class="preloader-spinner"></div>
+    </div>
+  </div>
 
-    // 2. Load Flutter engine directly with timestamp cache-buster on main.dart.js
-    const v = Date.now();
-    const flutterScript = document.createElement('script');
-    flutterScript.src = 'flutter.js?v=' + v;
-    flutterScript.onload = function() {
+  <script src="flutter.js" defer></script>
+  <script>
+    window.addEventListener('load', function() {
       if (window._flutter && window._flutter.loader) {
         _flutter.loader.loadEntrypoint({
-          entrypointUrl: 'main.dart.js?v=' + v,
           onEntrypointLoaded: function(engineInitializer) {
             engineInitializer.initializeEngine().then(function(appRunner) {
+              const preloader = document.getElementById('app-preloader');
+              if (preloader) {
+                preloader.style.opacity = '0';
+                preloader.style.visibility = 'hidden';
+                setTimeout(function() { preloader.remove(); }, 350);
+              }
               appRunner.runApp();
             });
           }
         });
       }
-    };
-    document.body.appendChild(flutterScript);
+    });
   </script>
 </body>
 </html>
