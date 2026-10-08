@@ -4318,6 +4318,20 @@ router.post('/classes/:classId/attendance-sessions', verifyToken, async (req, re
     );
 
     const [created] = await pool.query('SELECT * FROM class_attendance_sessions WHERE id = ?', [id]);
+    
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('attendance_session_opened', {
+        class_id: classId,
+        session_id: id,
+        session: created[0],
+      });
+      io.emit('attendance_updated', {
+        class_id: classId,
+        session_id: id,
+      });
+    }
+
     res.status(201).json({
       status: 'sukses',
       message: `Presensi Pekan ${weekNumber} berhasil dibuka!`,
@@ -4417,6 +4431,17 @@ router.put('/attendance-sessions/:sessionId/close', verifyToken, async (req, res
   try {
     const { sessionId } = req.params;
     await pool.query("UPDATE class_attendance_sessions SET status = 'closed', closed_at = NOW() WHERE id = ?", [sessionId]);
+    
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('attendance_session_closed', {
+        session_id: sessionId,
+      });
+      io.emit('attendance_updated', {
+        session_id: sessionId,
+      });
+    }
+
     res.json({ status: 'sukses', message: 'Sesi presensi telah ditutup' });
   } catch (error) {
     console.error('ATTENDANCE CLOSE ERROR:', error);

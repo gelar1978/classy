@@ -7125,7 +7125,7 @@ class _MahasiswaFlowState extends State<_MahasiswaFlow> with SingleTickerProvide
               tabs: const [
                 Tab(child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.rocket_launch_rounded, size: 16), SizedBox(width: 4), Text('🚀 Join Live', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11))])),
                 Tab(child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.analytics_rounded, size: 16), SizedBox(width: 4), Text('📊 Nilai Saya', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11))])),
-                Tab(child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.qr_code_scanner_rounded, size: 16), SizedBox(width: 4), Text('📷 Presensi QR', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11))])),
+                Tab(child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.fact_check_rounded, size: 16), SizedBox(width: 4), Text('📅 Presensi', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11))])),
                 Tab(child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.assignment_rounded, size: 16), SizedBox(width: 4), Text('📝 Homework', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11))])),
                 Tab(child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.style_rounded, size: 16), SizedBox(width: 4), Text('🎴 Flashcards', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11))])),
               ],
@@ -7135,12 +7135,15 @@ class _MahasiswaFlowState extends State<_MahasiswaFlow> with SingleTickerProvide
       ),
       body: TabBarView(
         controller: _tabController,
-        children: const [
-          _MahasiswaJoinAndLessonSubTab(),
-          MahasiswaGradesSubTab(),
-          MahasiswaAttendanceSubTab(),
-          _MahasiswaHomeworkSubTab(),
-          _MahasiswaFlashcardsSubTab(),
+        children: [
+          const _MahasiswaJoinAndLessonSubTab(),
+          const MahasiswaGradesSubTab(),
+          MahasiswaAttendanceSubTab(
+            classId: QuizizzService.currentClassId,
+            className: QuizizzService.currentClassName,
+          ),
+          const _MahasiswaHomeworkSubTab(),
+          const _MahasiswaFlashcardsSubTab(),
         ],
       ),
     );

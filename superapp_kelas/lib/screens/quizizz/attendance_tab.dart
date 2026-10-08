@@ -821,15 +821,74 @@ class MahasiswaAttendanceSubTab extends StatefulWidget {
 }
 
 class _MahasiswaAttendanceSubTabState extends State<MahasiswaAttendanceSubTab> {
+  final TextEditingController _codeController = TextEditingController();
   bool _submitting = false;
   Map<String, dynamic>? _lastSuccessSession;
   List<Map<String, dynamic>> _myHistory = [];
   bool _loadingHistory = true;
+  List<Map<String, dynamic>> _openSessions = [];
+  bool _loadingOpenSessions = false;
+  Timer? _refreshTimer;
+
+  String get _effectiveClassId =>
+      widget.classId ?? QuizizzService.currentClassId ?? '';
 
   @override
   void initState() {
     super.initState();
     _loadHistory();
+    _loadOpenSessions();
+    _setupSocketListener();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) {
+        _loadOpenSessions(showLoading: false);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    _codeController.dispose();
+    super.dispose();
+  }
+
+  void _setupSocketListener() {
+    SocketService.on('attendance_updated', (data) {
+      if (!mounted) return;
+      _loadHistory();
+      _loadOpenSessions(showLoading: false);
+    });
+    SocketService.on('attendance_session_opened', (data) {
+      if (!mounted) return;
+      _loadOpenSessions(showLoading: false);
+      _loadHistory();
+    });
+    SocketService.on('attendance_session_closed', (data) {
+      if (!mounted) return;
+      _loadOpenSessions(showLoading: false);
+      _loadHistory();
+    });
+  }
+
+  Future<void> _loadOpenSessions({bool showLoading = true}) async {
+    final cId = _effectiveClassId;
+    if (cId.isEmpty) return;
+    if (showLoading) {
+      setState(() => _loadingOpenSessions = true);
+    }
+    try {
+      final list = await QuizizzService.getAttendanceSessions(cId);
+      if (!mounted) return;
+      setState(() {
+        _openSessions = list.where((s) => s['status'] == 'open').toList();
+        if (showLoading) _loadingOpenSessions = false;
+      });
+    } catch (_) {
+      if (mounted && showLoading) {
+        setState(() => _loadingOpenSessions = false);
+      }
+    }
   }
 
   Future<void> _loadHistory() async {
@@ -842,19 +901,33 @@ class _MahasiswaAttendanceSubTabState extends State<MahasiswaAttendanceSubTab> {
     });
   }
 
-  Future<void> _processQrAttendance(String? rawScanned) async {
-    if (rawScanned == null || rawScanned.trim().isEmpty) return;
-    final scanned = rawScanned.trim();
+  Future<void> _submitAttendance({String? code, String? rawScanned, String? sessionId}) async {
+    final input = (code ?? rawScanned ?? '').trim();
+    if (input.isEmpty && (sessionId == null || sessionId.isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ Silakan ketik kode presensi atau scan QR code terlebih dahulu.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
 
     setState(() => _submitting = true);
     try {
-      final res = await QuizizzService.submitAttendance(sessionCode: scanned, qrData: scanned);
+      final res = await QuizizzService.submitAttendance(
+        sessionCode: input.isNotEmpty ? input : null,
+        sessionId: sessionId,
+        qrData: rawScanned,
+      );
       if (!mounted) return;
       setState(() {
         _lastSuccessSession = res['session'] as Map<String, dynamic>?;
         _submitting = false;
+        _codeController.clear();
       });
       await _loadHistory();
+      await _loadOpenSessions(showLoading: false);
 
       // Show success modal
       if (mounted) {
@@ -894,7 +967,7 @@ class _MahasiswaAttendanceSubTabState extends State<MahasiswaAttendanceSubTab> {
                     children: [
                       Text('Sesi: ${_lastSuccessSession?['title'] ?? '-'}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF065F46))),
                       const SizedBox(height: 4),
-                      Text('Kelas: ${_lastSuccessSession?['class_name'] ?? '-'}', style: const TextStyle(fontSize: 12, color: Color(0xFF065F46))),
+                      Text('Kelas: ${_lastSuccessSession?['class_name'] ?? widget.className ?? '-'}', style: const TextStyle(fontSize: 12, color: Color(0xFF065F46))),
                       const SizedBox(height: 4),
                       const Text('Status: ✅ HADIR (Tepat Waktu)', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12, color: Color(0xFF065F46))),
                     ],
@@ -921,286 +994,593 @@ class _MahasiswaAttendanceSubTabState extends State<MahasiswaAttendanceSubTab> {
     }
   }
 
+  Future<void> _processQrAttendance(String? rawScanned) async {
+    await _submitAttendance(rawScanned: rawScanned);
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Check if any open session in current class has already been attended
+    final isEffectiveClassFiltered = _effectiveClassId.isNotEmpty;
+    final relevantHistory = isEffectiveClassFiltered
+        ? _myHistory.where((h) => h['class_id']?.toString() == _effectiveClassId).toList()
+        : _myHistory;
+
     return SelectionArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 600),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // FORM PRESENSI CARD
-              Container(
-                padding: const EdgeInsets.all(28),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: _kNavyDark, width: 2),
-                  boxShadow: const [BoxShadow(color: _kNavyDark, offset: Offset(4, 4), blurRadius: 0)],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: _kMustardYellow,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: _kNavyDark, width: 1.5),
-                          ),
-                          child: const Icon(Icons.qr_code_scanner_rounded, color: _kNavyDark, size: 24),
-                        ),
-                        const SizedBox(width: 14),
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Presensi Kehadiran Kuliah',
-                                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: _kNavyDark),
-                              ),
-                              Text(
-                                'Pindai QR Code Presensi dari Dosen Anda',
-                                style: TextStyle(fontSize: 12, color: Colors.black54),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 620),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // CARD STATUS SESI TERBUKA DARI DOSEN
+                if (_openSessions.isNotEmpty) ...[
+                  ..._openSessions.map((openSess) {
+                    final openSessId = openSess['id']?.toString();
+                    final alreadyHadir = relevantHistory.any((h) =>
+                        h['session_id']?.toString() == openSessId &&
+                        (h['status']?.toString().toLowerCase() == 'hadir' ||
+                            h['record_status']?.toString().toLowerCase() == 'hadir'));
 
-                    // OPSI 1: SCAN KAMERA
-                    SizedBox(
-                      height: 52,
-                      child: ElevatedButton.icon(
-                        onPressed: _submitting
-                            ? null
-                            : () async {
-                                final scanned = await QrScannerHelper.scanQr();
-                                if (scanned != null && scanned.trim().isNotEmpty) {
-                                  _processQrAttendance(scanned);
-                                }
-                              },
-                        icon: const Icon(Icons.camera_alt_rounded, size: 22),
-                        label: Text(
-                          _submitting ? 'Memproses Presensi...' : '📷 Scan QR Presensi (Kamera Langsung)',
-                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _kNavyDark,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // OPSI 2: UNGGAH FILE QR
-                    SizedBox(
-                      height: 50,
-                      child: ElevatedButton.icon(
-                        onPressed: _submitting
-                            ? null
-                            : () async {
-                                final scanned = await QrScannerHelper.scanQrFromFile();
-                                if (scanned != null && scanned.trim().isNotEmpty) {
-                                  _processQrAttendance(scanned);
-                                }
-                              },
-                        icon: const Icon(Icons.drive_folder_upload_rounded, size: 20),
-                        label: const Text(
-                          '📁 Unggah File / Gambar QR (Jika Kamera Bermasalah)',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFEFF6FF),
-                          foregroundColor: const Color(0xFF1D4ED8),
-                          elevation: 0,
-                          side: const BorderSide(color: Color(0xFF93C5FD), width: 1.5),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // PETUNJUK
-                    Container(
-                      padding: const EdgeInsets.all(12),
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 18),
+                      padding: const EdgeInsets.all(18),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                        gradient: LinearGradient(
+                          colors: alreadyHadir
+                              ? [const Color(0xFFECFDF5), const Color(0xFFD1FAE5)]
+                              : [const Color(0xFFFFFBEB), const Color(0xFFFEF3C7)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: alreadyHadir ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                          width: 2,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: (alreadyHadir ? const Color(0xFF10B981) : const Color(0xFFF59E0B))
+                                .withValues(alpha: 0.2),
+                            offset: const Offset(2, 3),
+                            blurRadius: 6,
+                          ),
+                        ],
                       ),
-                      child: const Row(
+                      child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.info_outline_rounded, size: 18, color: Color(0xFF64748B)),
-                          SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: alreadyHadir ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              alreadyHadir ? Icons.check_circle_rounded : Icons.notifications_active_rounded,
+                              color: Colors.white,
+                              size: 24,
+                            ),
+                          ),
+                          const SizedBox(width: 14),
                           Expanded(
-                            child: Text(
-                              'Presensi hanya menggunakan pemindaian QR Code dari dosen. Apabila kamera browser bermasalah, Anda dapat mengunggah file screenshot / foto QR code secara langsung.',
-                              style: TextStyle(fontSize: 11, color: Color(0xFF475569), height: 1.3),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: alreadyHadir ? const Color(0xFF059669) : const Color(0xFFD97706),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        alreadyHadir ? '✅ SUDAH HADIR' : '🔔 SESI TERBUKA',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w900,
+                                          fontSize: 10,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Pekan ${openSess['week_number'] ?? 1}',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 12,
+                                        color: alreadyHadir ? const Color(0xFF065F46) : const Color(0xFF92400E),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  openSess['title'] ?? 'Presensi Pekan',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 15,
+                                    color: alreadyHadir ? const Color(0xFF064E3B) : const Color(0xFF78350F),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  alreadyHadir
+                                      ? 'Presensi Anda pada pekan ini telah tercatat resmi di sistem.'
+                                      : 'Dosen sedang membuka presensi untuk sesi ini. Silakan masukkan kode presensi di bawah atau scan QR.',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: alreadyHadir ? const Color(0xFF047857) : const Color(0xFFB45309),
+                                    height: 1.3,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
+                    );
+                  }),
+                ],
+
+                // FORM PRESENSI CARD
+                Container(
+                  padding: const EdgeInsets.all(26),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: _kNavyDark, width: 2),
+                    boxShadow: const [BoxShadow(color: _kNavyDark, offset: Offset(4, 4), blurRadius: 0)],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // HEADER CARD
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: _kMustardYellow,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: _kNavyDark, width: 1.8),
+                            ),
+                            child: const Icon(Icons.fact_check_rounded, color: _kNavyDark, size: 26),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  widget.className != null && widget.className!.isNotEmpty
+                                      ? 'Presensi ${widget.className}'
+                                      : 'Presensi Kehadiran Kuliah',
+                                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: _kNavyDark),
+                                ),
+                                const Text(
+                                  'Gunakan Kode Presensi, Scan QR, atau Unggah Gambar',
+                                  style: TextStyle(fontSize: 12, color: Colors.black54),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 22),
+
+                      // ==========================================
+                      // FORM INPUT KODE PRESENSI MANUAL
+                      // ==========================================
+                      Container(
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0FDF4),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: const Color(0xFF86EFAC), width: 1.5),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.key_rounded, color: Color(0xFF166534), size: 18),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Ketik Kode Presensi Pekan Ini',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 13,
+                                    color: Color(0xFF166534),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Masukkan kode presensi (contoh: W1-8392) yang dibagikan oleh dosen jika kesulitan scan QR.',
+                              style: TextStyle(fontSize: 11, color: Color(0xFF15803D), height: 1.3),
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: _codeController,
+                                    textCapitalization: TextCapitalization.characters,
+                                    autocorrect: false,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 2,
+                                      fontSize: 15,
+                                      color: _kNavyDark,
+                                    ),
+                                    decoration: InputDecoration(
+                                      filled: true,
+                                      fillColor: Colors.white,
+                                      hintText: 'Contoh: W1-8392',
+                                      hintStyle: const TextStyle(
+                                        color: Colors.black38,
+                                        letterSpacing: 0,
+                                        fontWeight: FontWeight.normal,
+                                        fontSize: 13,
+                                      ),
+                                      prefixIcon: const Icon(Icons.pin_rounded, size: 20, color: _kNavyDark),
+                                      suffixIcon: _codeController.text.isNotEmpty
+                                          ? IconButton(
+                                              icon: const Icon(Icons.clear_rounded, size: 18),
+                                              onPressed: () => setState(() => _codeController.clear()),
+                                            )
+                                          : null,
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: const BorderSide(color: Color(0xFF86EFAC), width: 1.5),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: const BorderSide(color: Color(0xFF86EFAC), width: 1.5),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: const BorderSide(color: _kNavyDark, width: 2),
+                                      ),
+                                    ),
+                                    onChanged: (_) => setState(() {}),
+                                    onSubmitted: (val) {
+                                      if (!_submitting) _submitAttendance(code: val);
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                ElevatedButton(
+                                  onPressed: (_submitting || _codeController.text.trim().isEmpty)
+                                      ? null
+                                      : () => _submitAttendance(code: _codeController.text),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF059669),
+                                    foregroundColor: Colors.white,
+                                    disabledBackgroundColor: Colors.grey.shade300,
+                                    disabledForegroundColor: Colors.grey.shade500,
+                                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                    elevation: 0,
+                                  ),
+                                  child: _submitting
+                                      ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                        )
+                                      : const Row(
+                                          children: [
+                                            Icon(Icons.check_circle_outline_rounded, size: 18),
+                                            SizedBox(width: 6),
+                                            Text(
+                                              'Kirim Presensi',
+                                              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+                                            ),
+                                          ],
+                                        ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+
+                      // PEMBATAS ATAU SCAN QR
+                      Row(
+                        children: [
+                          const Expanded(child: Divider(color: Color(0xFFCBD5E1), thickness: 1)),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: Text(
+                              'ATAU GUNAKAN SCAN QR',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 11,
+                                color: Colors.grey.shade600,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                          ),
+                          const Expanded(child: Divider(color: Color(0xFFCBD5E1), thickness: 1)),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+
+                      // OPSI SCAN KAMERA
+                      SizedBox(
+                        height: 50,
+                        child: ElevatedButton.icon(
+                          onPressed: _submitting
+                              ? null
+                              : () async {
+                                  final scanned = await QrScannerHelper.scanQr();
+                                  if (scanned != null && scanned.trim().isNotEmpty) {
+                                    _processQrAttendance(scanned);
+                                  }
+                                },
+                          icon: const Icon(Icons.camera_alt_rounded, size: 20),
+                          label: Text(
+                            _submitting ? 'Memproses Presensi...' : '📷 Scan QR Presensi (Kamera Langsung)',
+                            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _kNavyDark,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+
+                      // OPSI UNGGAH FILE QR
+                      SizedBox(
+                        height: 48,
+                        child: ElevatedButton.icon(
+                          onPressed: _submitting
+                              ? null
+                              : () async {
+                                  final scanned = await QrScannerHelper.scanQrFromFile();
+                                  if (scanned != null && scanned.trim().isNotEmpty) {
+                                    _processQrAttendance(scanned);
+                                  }
+                                },
+                          icon: const Icon(Icons.drive_folder_upload_rounded, size: 20),
+                          label: const Text(
+                            '📁 Unggah File / Screenshot QR',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFEFF6FF),
+                            foregroundColor: const Color(0xFF1D4ED8),
+                            elevation: 0,
+                            side: const BorderSide(color: Color(0xFF93C5FD), width: 1.5),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // PETUNJUK
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFCBD5E1)),
+                        ),
+                        child: const Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.info_outline_rounded, size: 18, color: Color(0xFF64748B)),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '💡 Tips: Anda dapat melakukan presensi dengan mengetik Kode Presensi manual dari dosen, memindai QR code secara langsung via kamera, atau mengunggah gambar QR code.',
+                                style: TextStyle(fontSize: 11, color: Color(0xFF475569), height: 1.35),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 28),
+
+                // RIWAYAT PRESENSI SAYA
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      '📜 Riwayat Presensi Saya',
+                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: _kNavyDark),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.refresh_rounded, size: 18, color: _kNavyDark),
+                      onPressed: () {
+                        _loadHistory();
+                        _loadOpenSessions();
+                      },
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 28),
+                const SizedBox(height: 12),
 
-              // RIWAYAT PRESENSI SAYA
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    '📜 Riwayat Presensi Saya',
-                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: _kNavyDark),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.refresh_rounded, size: 18, color: _kNavyDark),
-                    onPressed: _loadHistory,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-
-              if (_loadingHistory)
-                const Center(child: CircularProgressIndicator(color: _kNavyDark))
-              else if (_myHistory.isEmpty)
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: _kNavyDark, width: 1.5),
-                  ),
-                  child: const Center(
-                    child: Text('Belum ada catatan presensi yang terekam.', style: TextStyle(color: Colors.black54)),
-                  ),
-                )
-              else
-                ..._myHistory.map((h) {
-                  final title = h['session_title'] ?? 'Presensi';
-                  final week = h['week_number'] ?? 1;
-                  final dateStr = h['attended_at']?.toString() ?? '-';
-                  final className = h['class_name'] ?? '';
-                  final status = (h['status'] ?? 'belum_hadir').toString().toLowerCase();
-                  final source = h['source'] ?? (status == 'hadir' ? 'Scan QR / Dosen' : '-');
-                  final notes = h['notes'];
-
-                  Color cardBorderColor;
-                  Color iconBgColor;
-                  Color iconColor;
-                  IconData iconData;
-                  Color badgeBgColor;
-                  Color badgeTextColor;
-                  String badgeText;
-
-                  if (status == 'hadir') {
-                    cardBorderColor = const Color(0xFF059669);
-                    iconBgColor = const Color(0xFFD1FAE5);
-                    iconColor = const Color(0xFF059669);
-                    iconData = Icons.check_circle_rounded;
-                    badgeBgColor = const Color(0xFFD1FAE5);
-                    badgeTextColor = const Color(0xFF065F46);
-                    badgeText = 'HADIR';
-                  } else if (status == 'sakit') {
-                    cardBorderColor = const Color(0xFFD97706);
-                    iconBgColor = const Color(0xFFFEF3C7);
-                    iconColor = const Color(0xFFD97706);
-                    iconData = Icons.medical_services_rounded;
-                    badgeBgColor = const Color(0xFFFEF3C7);
-                    badgeTextColor = const Color(0xFF92400E);
-                    badgeText = 'SAKIT';
-                  } else if (status == 'izin') {
-                    cardBorderColor = const Color(0xFF2563EB);
-                    iconBgColor = const Color(0xFFDBEAFE);
-                    iconColor = const Color(0xFF2563EB);
-                    iconData = Icons.info_rounded;
-                    badgeBgColor = const Color(0xFFDBEAFE);
-                    badgeTextColor = const Color(0xFF1E40AF);
-                    badgeText = 'IZIN';
-                  } else {
-                    cardBorderColor = Colors.grey.shade400;
-                    iconBgColor = Colors.grey.shade200;
-                    iconColor = Colors.grey.shade600;
-                    iconData = Icons.cancel_outlined;
-                    badgeBgColor = Colors.grey.shade200;
-                    badgeTextColor = Colors.black87;
-                    badgeText = 'BELUM HADIR';
-                  }
-
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.all(16),
+                if (_loadingHistory)
+                  const Center(child: CircularProgressIndicator(color: _kNavyDark))
+                else if (relevantHistory.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: cardBorderColor, width: 1.5),
-                      boxShadow: [BoxShadow(color: cardBorderColor.withValues(alpha: 0.3), offset: const Offset(2, 2), blurRadius: 0)],
+                      border: Border.all(color: _kNavyDark, width: 1.5),
                     ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: iconBgColor,
-                            shape: BoxShape.circle,
+                    child: const Center(
+                      child: Text('Belum ada catatan presensi yang terekam.', style: TextStyle(color: Colors.black54)),
+                    ),
+                  )
+                else
+                  ...relevantHistory.map((h) {
+                    final title = h['session_title'] ?? 'Presensi';
+                    final week = h['week_number'] ?? 1;
+                    final dateStr = h['attended_at']?.toString() ?? '-';
+                    final className = h['class_name'] ?? '';
+                    final status = (h['record_status'] ?? h['status'] ?? 'belum_hadir').toString().toLowerCase();
+                    final source = h['source'] ?? (status == 'hadir' ? 'Kode / Scan QR / Dosen' : '-');
+                    final notes = h['record_notes'] ?? h['notes'];
+
+                    Color cardBorderColor;
+                    Color iconBgColor;
+                    Color iconColor;
+                    IconData iconData;
+                    Color badgeBgColor;
+                    Color badgeTextColor;
+                    String badgeText;
+
+                    if (status == 'hadir') {
+                      cardBorderColor = const Color(0xFF059669);
+                      iconBgColor = const Color(0xFFD1FAE5);
+                      iconColor = const Color(0xFF059669);
+                      iconData = Icons.check_circle_rounded;
+                      badgeBgColor = const Color(0xFFD1FAE5);
+                      badgeTextColor = const Color(0xFF065F46);
+                      badgeText = 'HADIR';
+                    } else if (status == 'sakit') {
+                      cardBorderColor = const Color(0xFFD97706);
+                      iconBgColor = const Color(0xFFFEF3C7);
+                      iconColor = const Color(0xFFD97706);
+                      iconData = Icons.medical_services_rounded;
+                      badgeBgColor = const Color(0xFFFEF3C7);
+                      badgeTextColor = const Color(0xFF92400E);
+                      badgeText = 'SAKIT';
+                    } else if (status == 'izin') {
+                      cardBorderColor = const Color(0xFF2563EB);
+                      iconBgColor = const Color(0xFFDBEAFE);
+                      iconColor = const Color(0xFF2563EB);
+                      iconData = Icons.info_rounded;
+                      badgeBgColor = const Color(0xFFDBEAFE);
+                      badgeTextColor = const Color(0xFF1E40AF);
+                      badgeText = 'IZIN';
+                    } else {
+                      cardBorderColor = Colors.grey.shade400;
+                      iconBgColor = Colors.grey.shade200;
+                      iconColor = Colors.grey.shade600;
+                      iconData = Icons.cancel_outlined;
+                      badgeBgColor = Colors.grey.shade200;
+                      badgeTextColor = Colors.black87;
+                      badgeText = 'BELUM HADIR';
+                    }
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: cardBorderColor, width: 1.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: cardBorderColor.withValues(alpha: 0.3),
+                            offset: const Offset(2, 2),
+                            blurRadius: 0,
                           ),
-                          child: Icon(iconData, color: iconColor, size: 20),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: _kNavyDark)),
-                              const SizedBox(height: 2),
-                              Text('$className | Pekan $week | Sumber: $source', style: const TextStyle(fontSize: 11, color: Colors.black54, fontWeight: FontWeight.w600)),
-                              if (dateStr != '-') ...[
-                                const SizedBox(height: 2),
-                                Text('Waktu: $dateStr', style: const TextStyle(fontSize: 11, color: Colors.black45)),
-                              ],
-                              if (notes != null && notes.toString().trim().isNotEmpty) ...[
-                                const SizedBox(height: 4),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.shade100,
-                                    borderRadius: BorderRadius.circular(6),
+                        ],
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: iconBgColor,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(iconData, color: iconColor, size: 20),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  title,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 14,
+                                    color: _kNavyDark,
                                   ),
-                                  child: Text('📝 $notes', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey.shade800)),
                                 ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '$className | Pekan $week | Sumber: $source',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.black54,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                if (dateStr != '-') ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Waktu: $dateStr',
+                                    style: const TextStyle(fontSize: 11, color: Colors.black45),
+                                  ),
+                                ],
+                                if (notes != null && notes.toString().trim().isNotEmpty) ...[
+                                  const SizedBox(height: 4),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade100,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      '📝 $notes',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.grey.shade800,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ],
-                            ],
+                            ),
                           ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: badgeBgColor,
-                            borderRadius: BorderRadius.circular(10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: badgeBgColor,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              badgeText,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 11,
+                                color: badgeTextColor,
+                              ),
+                            ),
                           ),
-                          child: Text(badgeText, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11, color: badgeTextColor)),
-                        ),
-                      ],
-                    ),
-                  );
-                }),
-            ],
+                        ],
+                      ),
+                    );
+                  }),
+              ],
+            ),
           ),
         ),
-      ),
       ),
     );
   }
