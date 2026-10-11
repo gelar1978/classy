@@ -429,8 +429,9 @@ class _ResearchDocumentsTabState extends State<ResearchDocumentsTab> {
     DateTime selectedDate = DateTime.now().add(const Duration(days: 7));
     Uint8List? fileBytes;
     String? fileName;
+    bool isSubmitting = false;
 
-    final uploaded = await showDialog<bool>(
+    final uploaded = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
@@ -668,9 +669,13 @@ class _ResearchDocumentsTabState extends State<ResearchDocumentsTab> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal', style: TextStyle(color: _kNavyDark))),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, null),
+              child: const Text('Batal', style: TextStyle(color: _kNavyDark)),
+            ),
             ElevatedButton(
-              onPressed: () async {
+              onPressed: () {
+                if (isSubmitting) return;
                 final docName = nameCtrl.text.trim();
                 if (docName.isEmpty) {
                   ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Nama dokumen wajib diisi')));
@@ -681,23 +686,19 @@ class _ResearchDocumentsTabState extends State<ResearchDocumentsTab> {
                   return;
                 }
 
-                try {
-                  final deadlineStr = '${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')} 23:59:59';
-                  await QuizizzService.uploadResearchDocument(
-                    widget.classId,
-                    groupId: selectedGroupId ?? '',
-                    documentName: docName,
-                    docType: selectedDocType,
-                    deadline: deadlineStr,
-                    fileBytes: fileBytes!,
-                    fileName: fileName!,
-                  );
-                  if (ctx.mounted) Navigator.pop(ctx, true);
-                } catch (e) {
-                  if (ctx.mounted) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Gagal mengunggah: $e')));
-                  }
-                }
+                isSubmitting = true;
+                setDialogState(() {});
+                final deadlineStr = '${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')} 23:59:59';
+
+                // Langsung tutup jendela formulir agar user tidak klik berkali-kali
+                Navigator.pop(ctx, {
+                  'groupId': selectedGroupId ?? '',
+                  'documentName': docName,
+                  'docType': selectedDocType,
+                  'deadline': deadlineStr,
+                  'fileBytes': fileBytes!,
+                  'fileName': fileName!,
+                });
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: _kNavyDark,
@@ -712,7 +713,95 @@ class _ResearchDocumentsTabState extends State<ResearchDocumentsTab> {
       ),
     );
 
-    if (uploaded == true) _loadDocuments();
+    if (uploaded != null && mounted) {
+      final payload = uploaded;
+      // Tampilkan progress bar dialog yang tidak bisa ditutup secara manual
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (pCtx) => PopScope(
+          canPop: false,
+          child: AlertDialog(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: const BorderSide(color: _kNavyDark, width: 1.5),
+            ),
+            content: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2.5, color: _kNavyDark),
+                      ),
+                      const SizedBox(width: 14),
+                      const Text(
+                        'Sedang Mengunggah Dokumen...',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: _kNavyDark),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${payload['documentName']} (${payload['fileName']})',
+                    style: const TextStyle(fontSize: 12, color: Colors.black54),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 14),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: const LinearProgressIndicator(
+                      minHeight: 6,
+                      color: _kNavyDark,
+                      backgroundColor: Color(0xFFE2E8F0),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      try {
+        await QuizizzService.uploadResearchDocument(
+          widget.classId,
+          groupId: payload['groupId'],
+          documentName: payload['documentName'],
+          docType: payload['docType'],
+          deadline: payload['deadline'],
+          fileBytes: payload['fileBytes'],
+          fileName: payload['fileName'],
+        );
+
+        if (mounted) {
+          Navigator.of(context, rootNavigator: true).pop(); // Tutup progress bar dialog
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('✅ Dokumen "${payload['documentName']}" berhasil diunggah!'),
+              backgroundColor: const Color(0xFF059669),
+            ),
+          );
+          _loadDocuments();
+        }
+      } catch (e) {
+        if (mounted) {
+          Navigator.of(context, rootNavigator: true).pop(); // Tutup progress bar dialog
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('❌ Gagal mengunggah dokumen: $e'),
+              backgroundColor: Colors.red.shade700,
+            ),
+          );
+        }
+      }
+    }
   }
 
   // MAHASISWA: Dialog Edit Dokumen Approval
