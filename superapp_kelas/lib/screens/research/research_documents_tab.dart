@@ -1009,7 +1009,9 @@ class _ResearchDocumentsTabState extends State<ResearchDocumentsTab> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Apakah Anda yakin ingin menghapus dokumen "${doc['document_name']}" dari ${_getStudentDisplayName(doc)}?',
+              _isDosen
+                  ? 'Apakah Anda yakin ingin menghapus dokumen "${doc['document_name']}" dari ${_getStudentDisplayName(doc)}?'
+                  : 'Apakah Anda yakin ingin menghapus dokumen "${doc['document_name']}"?',
               style: const TextStyle(fontSize: 13),
             ),
             const SizedBox(height: 8),
@@ -2687,7 +2689,7 @@ class _ResearchDocumentsTabState extends State<ResearchDocumentsTab> {
                       ),
                     ),
                   ]
-                  // JIKA MAHASISWA: BISA EDIT DOKUMEN (TIDAK BISA HAPUS SAMA SEKALI)
+                  // JIKA MAHASISWA: BISA EDIT & HAPUS DOKUMEN
                   else ...[
                     OutlinedButton.icon(
                       onPressed: () => _showEditDocumentDialog(doc),
@@ -2697,6 +2699,18 @@ class _ResearchDocumentsTabState extends State<ResearchDocumentsTab> {
                         foregroundColor: const Color(0xFF1D4ED8),
                         backgroundColor: const Color(0xFFEFF6FF),
                         side: const BorderSide(color: Color(0xFF93C5FD), width: 1.2),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () => _deleteDocument(doc),
+                      icon: const Icon(Icons.delete_outline_rounded, size: 16),
+                      label: const Text('Hapus', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red.shade700,
+                        backgroundColor: const Color(0xFFFEF2F2),
+                        side: BorderSide(color: Colors.red.shade300, width: 1.2),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       ),

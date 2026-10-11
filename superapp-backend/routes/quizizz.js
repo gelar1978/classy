@@ -6015,22 +6015,30 @@ router.put('/research-documents/:docId', verifyToken, optionalUploadDoc, async (
   }
 });
 
-// 9c. DELETE Dokumen Approval (Hanya Dosen yang Bisa Menghapus, Mahasiswa Tidak Bisa)
+// 9c. DELETE Dokumen Approval (Dosen atau Mahasiswa pemilik/anggota grup)
 router.delete('/research-documents/:docId', verifyToken, async (req, res) => {
   try {
-    if (req.user.role !== 'dosen') {
-      return res.status(403).json({
-        status: 'gagal',
-        message: 'Mahasiswa tidak dapat menghapus dokumen approval. Penghapusan dokumen hanya dapat dilakukan oleh Dosen.',
-      });
-    }
-
     const { docId } = req.params;
     const [docs] = await pool.query('SELECT * FROM research_documents WHERE id = ?', [docId]);
     if (docs.length === 0) {
       return res.status(404).json({ status: 'gagal', message: 'Dokumen tidak ditemukan' });
     }
     const doc = docs[0];
+
+    // Cek hak akses jika bukan dosen: pastikan mahasiswa pemilik atau anggota grup
+    if (req.user.role !== 'dosen') {
+      const userId = String(req.user.id);
+      const [isMember] = await pool.query(
+        'SELECT 1 FROM research_group_members WHERE group_id = ? AND student_id = ?',
+        [doc.group_id, userId]
+      );
+      if (doc.student_id !== userId && isMember.length === 0) {
+        return res.status(403).json({
+          status: 'gagal',
+          message: 'Anda tidak memiliki hak untuk menghapus dokumen grup ini',
+        });
+      }
+    }
 
     // Hapus file fisik jika ada
     try {
