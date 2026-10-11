@@ -418,9 +418,28 @@
 
   <script src="flutter.js" defer></script>
   <script>
+    // FORCE UNREGISTER STALE SERVICE WORKERS & CLEAR STALE CACHES
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for (let registration of registrations) {
+          registration.unregister();
+        }
+      });
+    }
+    if ('caches' in window) {
+      caches.keys().then(function(names) {
+        for (let name of names) {
+          caches.delete(name);
+        }
+      });
+    }
+
+    const cacheBuster = Date.now();
+
     window.addEventListener('load', function() {
       if (window._flutter && window._flutter.loader) {
         _flutter.loader.loadEntrypoint({
+          entrypointUrl: 'main.dart.js?v=' + cacheBuster,
           onEntrypointLoaded: function(engineInitializer) {
             engineInitializer.initializeEngine().then(function(appRunner) {
               const preloader = document.getElementById('app-preloader');

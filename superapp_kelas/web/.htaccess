@@ -51,12 +51,14 @@ DirectoryIndex index.html index.php
 # 5. CACHE CONTROL HEADERS
 # ------------------------------------------------------------------------------
 <IfModule mod_headers.c>
-  <FilesMatch "(index\.html|flutter_service_worker\.js|version\.json)$">
-    Header set Cache-Control "no-cache, must-revalidate"
-  </FilesMatch>
-
   <FilesMatch "\.(js|wasm|css|png|jpg|jpeg|gif|ico|svg|ttf|otf|woff|woff2)$">
     Header set Cache-Control "public, max-age=2592000, immutable"
+  </FilesMatch>
+
+  <FilesMatch "(index\.html|flutter_service_worker\.js|version\.json)$">
+    Header set Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
   </FilesMatch>
 
   Header always set X-Content-Type-Options "nosniff"

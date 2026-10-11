@@ -201,7 +201,7 @@ class _ResearchDocumentsTabState extends State<ResearchDocumentsTab> {
   }
 
   String get _selectedGroupName {
-    if (_selectedGroupId == null) return 'Grup';
+    if (_selectedGroupId == null) return 'Semua Grup';
     final found = _availableGroups.firstWhere(
       (g) => g['id']?.toString() == _selectedGroupId,
       orElse: () => {'name': 'Grup'},
@@ -212,8 +212,7 @@ class _ResearchDocumentsTabState extends State<ResearchDocumentsTab> {
   List<Map<String, dynamic>> get _currentSubTabDocs {
     return _documents.where((d) {
       if (_getDocType(d) != _activeSubTab) return false;
-      if (!_isDosen) return true;
-      if (_selectedGroupId == null) return false;
+      if (_selectedGroupId == null) return true;
       return d['group_id']?.toString() == _selectedGroupId;
     }).toList();
   }
@@ -1944,6 +1943,8 @@ class _ResearchDocumentsTabState extends State<ResearchDocumentsTab> {
 
   Widget _buildGroupSidebar({bool isMobile = false}) {
     final groups = _availableGroups;
+    final totalAll = _countTotalInSubTab(_activeSubTab);
+    final pendingAll = _countPendingInSubTab(_activeSubTab);
 
     if (isMobile) {
       // Horizontal scrollable chips for mobile view
@@ -1959,21 +1960,32 @@ class _ResearchDocumentsTabState extends State<ResearchDocumentsTab> {
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(
-            children: groups.map((g) {
-              final gId = g['id']?.toString() ?? '';
-              final gName = g['name']?.toString() ?? 'Grup';
-              final gTotal = _countTotalInGroup(gId);
-              final gPending = _countPendingInGroup(gId);
-              return Padding(
+            children: [
+              Padding(
                 padding: const EdgeInsets.only(right: 6),
                 child: _buildGroupChip(
-                  id: gId,
-                  name: gName,
-                  total: gTotal,
-                  pending: gPending,
+                  id: null,
+                  name: 'Semua Grup',
+                  total: totalAll,
+                  pending: pendingAll,
                 ),
-              );
-            }).toList(),
+              ),
+              ...groups.map((g) {
+                final gId = g['id']?.toString() ?? '';
+                final gName = g['name']?.toString() ?? 'Grup';
+                final gTotal = _countTotalInGroup(gId);
+                final gPending = _countPendingInGroup(gId);
+                return Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: _buildGroupChip(
+                    id: gId,
+                    name: gName,
+                    total: gTotal,
+                    pending: gPending,
+                  ),
+                );
+              }),
+            ],
           ),
         ),
       );
@@ -1992,6 +2004,17 @@ class _ResearchDocumentsTabState extends State<ResearchDocumentsTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: _buildGroupSidebarItem(
+              id: null,
+              name: 'Semua Grup',
+              subtitle: 'Tampilkan seluruh dokumen',
+              total: totalAll,
+              pending: pendingAll,
+              icon: Icons.dashboard_customize_rounded,
+            ),
+          ),
           if (groups.isEmpty)
             Container(
               padding: const EdgeInsets.all(12),
@@ -2032,7 +2055,7 @@ class _ResearchDocumentsTabState extends State<ResearchDocumentsTab> {
   }
 
   Widget _buildGroupSidebarItem({
-    required String id,
+    required String? id,
     required String name,
     String? subtitle,
     required int total,
@@ -2124,7 +2147,7 @@ class _ResearchDocumentsTabState extends State<ResearchDocumentsTab> {
   }
 
   Widget _buildGroupChip({
-    required String id,
+    required String? id,
     required String name,
     required int total,
     required int pending,
@@ -2254,7 +2277,7 @@ class _ResearchDocumentsTabState extends State<ResearchDocumentsTab> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            isDosen && _selectedGroupId != null
+                            _selectedGroupId != null
                                 ? '${isPaperTab ? 'Persetujuan Dokumen' : config['title']} — $_selectedGroupName (${currentDocs.length})'
                                 : '${isPaperTab ? 'Persetujuan Dokumen' : config['title']} (${currentDocs.length})',
                             style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: _kNavyDark),
@@ -2346,11 +2369,9 @@ class _ResearchDocumentsTabState extends State<ResearchDocumentsTab> {
                     const Icon(Icons.folder_open_rounded, size: 48, color: Colors.black26),
                     const SizedBox(height: 12),
                     Text(
-                      isDosen
-                          ? (_selectedGroupId != null
-                              ? 'Belum ada pengajuan dokumen ${config['label']} dari $_selectedGroupName.'
-                              : 'Belum ada pengajuan dokumen ${config['label']} dari grup ini.')
-                          : 'Belum ada dokumen ${config['label']} yang diunggah. Klik "Unggah ${config['label']} (+)" untuk mengajukan approval.',
+                      _selectedGroupId != null
+                          ? 'Belum ada dokumen ${config['label']} dari $_selectedGroupName.'
+                          : 'Belum ada dokumen ${config['label']} yang diunggah.',
                       style: const TextStyle(fontSize: 13, color: Colors.black54),
                       textAlign: TextAlign.center,
                     ),
@@ -2383,8 +2404,8 @@ class _ResearchDocumentsTabState extends State<ResearchDocumentsTab> {
             _buildSubTabBar(),
             const SizedBox(height: 16),
 
-            // IF DOSEN & DESKTOP: ROW LAYOUT (LEFT SIDEBAR GRUP + MAIN CONTENT)
-            if (isDosen && !isMobileLayout)
+            // ROW LAYOUT (LEFT SIDEBAR GRUP + MAIN CONTENT) FOR DESKTOP
+            if (!isMobileLayout)
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -2393,15 +2414,12 @@ class _ResearchDocumentsTabState extends State<ResearchDocumentsTab> {
                   Expanded(child: buildMainContent()),
                 ],
               )
-            // IF DOSEN & MOBILE: STACKED (CHIPS GRUP DI ATAS + MAIN CONTENT DI BAWAH)
-            else if (isDosen && isMobileLayout) ...[
+            // STACKED LAYOUT (CHIPS GRUP DI ATAS + MAIN CONTENT DI BAWAH) FOR MOBILE
+            else ...[
               _buildGroupSidebar(isMobile: true),
               const SizedBox(height: 14),
               buildMainContent(),
-            ]
-            // IF MAHASISWA: DIRECT MAIN CONTENT (NO GROUP SELECTOR)
-            else
-              buildMainContent(),
+            ],
           ],
         ),
       ),
